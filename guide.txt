@@ -1,3 +1,5 @@
+#Martin Fedorčák / Discord - Martin F.
+
 1. Tvorba a nastavení uživatele
 
 	a) přepneme se na root usera
