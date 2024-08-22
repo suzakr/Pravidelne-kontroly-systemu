@@ -1,0 +1,47 @@
+1. Tvorba a nastavení uživatele
+
+	a) přepneme se na root usera
+		sudo su
+	b) vytvoříme usera "automata"
+		useradd -u 3000 -c "Automated Monitoring User" automata
+
+2. Tvorba a nastavení adresáře
+
+	a) přesuneme se do kořenového adresáře a vytvoříme adresář "monitoring"
+		cd /
+		mkdir monitoring
+	b) změníme group adresáře a nastavíme práva adresáře na 770
+		chgrp automata monitoring
+		chmod 770 monitoring
+
+3. Monitorovací script
+
+	a) jako root se přesuneme do rootovského adresáře a stáhneme si script
+		cd ~
+		wget https://raw.githubusercontent.com/ENGETO-Academy/Linux-public/main/scripts/runmon.sh
+	b) nastavíme práva pro stažený script
+		chmod 700 runmon.sh
+			(Když jsme stáhli script jako root, vlastník bude uživatel root a skupina root defaultně)
+
+4. Nastavení usera "automata"
+
+	a) otevřeme file sudoers a zeditujeme file (na konec filu)
+		visudo
+		(edit:)	 ## Allows user automata to use /root/runmon.sh
+                         automata        ALL=(ALL)       /root/runmon.sh
+				(Uložíme pomocí ":wq!")
+
+5. Nastavení crontabu
+
+	a) předem si vytvoříme file mon_archive.zip pomocí file "empty", který pak zevnitř smažeme
+		su automata
+		cd /home/automata
+		touch empty | zip mon_archive.zip empty
+		zip -d mon_archive.zip empty
+			(Předem si vytvoříme .zip file, abychom pak do něj mohli vkládat .log files z /monitoring)
+	b) nastavíme si dva řádky do uživatelského crontabu usera "automata"
+		crontab -e
+		(edit:)  0 8-17/2 * * 1-5 sudo /root/runmon.sh
+		         0 22 * * 0 zip -m /home/automata/mon_archive.zip /monitoring/runmon*.log
+				(Uložíme pomocí ":wq!")
+				(Můžeme před každý řádek napsat #, pokud bychom chtěli funkci crontabu zastavit)
