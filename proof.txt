@@ -1,0 +1,85 @@
+1. Tvorba a nastavení uživatele
+
+	vytvoříme usera "automata"
+		useradd -u 3000 -c "Automated Monitoring User" automata
+			--ověření--> 	cat /etc/passwd
+						(Na konci bude zobrazen uživatel "automata" s UID a GID 3000 a komentářem "Automated Monitoring User" )
+				případně
+					id automata
+						(Druhé ověření, ovšem bez zobrazení komentáře!)
+
+2. Tvorba a nastavení adresáře
+
+	vytvoříme adresář "monitoring"
+		mkdir monitoring
+			--ověření-->	ls -l /
+						(V zobrazeném seznamu se bude nacházet DIR "monitoring")
+				případně
+					ls -l /
+						(Pokud budeme mít u vypsaných práv pro DIR "monitoring" na začátku písmeno "d", jedná se skutečně o DIR)
+	změníme group adresáře a nastavíme práva adresáře na 770
+		chgrp automata monitoring
+			--ověření-->	ls -l /
+						(Na pozici pro "user owner" bude "root", na pozici pro "group owner" bude "automata")
+		chmod 770 monitoring
+			--ověření-->	ls -l /
+						(Práva 770 jsou přeložená také jako rwxrwx---, tudíž také toto označení nalezneme v seznamu u DIR "monitoring")
+
+3. Monitorovací script
+
+	jako root se přesuneme do "root" adresáře a stáhneme si script
+		cd ~
+		wget https://raw.githubusercontent.com/ENGETO-Academy/Linux-public/main/scripts/runmon.sh
+			--ověření-->	ls -l /root
+						(Bude se zde nacházet file "runmon.sh", který jsme si stáhli)
+	nastavíme práva pro stažený script
+		chmod 700 runmon.sh
+			--ověření-->	ls -l /root
+						(Práva 700 jsou přeložená také jako rwx------, tudíž také toto označení nalezneme v seznamu u file "runmon.sh")
+		"vlastník user a group "root"
+			--ověření-->	ls -l /root
+						(Když jsme stáhli script v předchozím kroku jako "root", vlastník bude uživatel "root" a skupina "root" defaultně)
+
+4. Nastavení usera "automata"
+
+	otevřeme file sudoers a zeditujeme file (na konec filu)
+		visudo
+		(edit:)	 ## Allows user automata to use /root/runmon.sh
+                         automata        ALL=(ALL)       /root/runmon.sh
+				(Uložíme pomocí ":wq!")
+
+			--ověření-->	su automata
+					sudo /root/runmon.sh
+					ls /monitoring
+						(Jako user "automata" spustím uložený script "runmon.sh" z "/root". Pokud mi command nevyhodí žádnou error message, pravděpodobně user "automata" script spustil, což můžeme zkontrolovat ještě tím, že se podíváme commandem "ls" do DIR "monitoring" a zkontrolujeme, že se tam nachází nový file s příponou ".log".)
+					(jako user "automata")
+					sudo visudo
+						(Vyhodí nám to error message, že user "automata" nemá právo odpálit tento command jako "root" user, čímž jsme si ověřili, že právo na command "sudo" má jen na námi vybraný command, čili "sudo /root/runmon.sh")
+ 
+5. Nastavení crontabu
+
+	předem si vytvoříme file mon_archive.zip pomocí file "empty", který pak zevnitř smažeme
+		su automata
+		cd /home/automata
+		touch empty | zip mon_archive.zip empty
+		zip -d mon_archive.zip empty
+
+			--ověření-->	ls -l /home/automata
+						(Bude se zde nacházet ".zip" file s názvem "mon_archive.zip")
+					vi /home/automata/mon_archive.zip
+						(Otevřením filu "mon_archive.zip" zjistíme, že je file skutečně prázdný)
+
+	nastavíme si dva řádky do uživatelského crontabu usera "automata"
+		crontab -e
+		(edit:)  ## Pravidelna kontrola systemu ##
+             0 8-17/2 * * 1-5 sudo /root/runmon.sh
+		         0 22 * * 0 zip -m /home/automata/mon_archive.zip /monitoring/runmon*.log
+
+			--ověření-->	(edit:)  ## Crontab test ##
+						                 * * * * * sudo /root/runmon.sh
+						                 */10 * * * * zip -m /home/automata/test.zip /monitoring/runmon*.log
+
+						(Pro tento test jsem si ještě v "/home/automata" vytvořil další file "test.zip", abych si udržel file "mon_archive.zip" čistý)
+						(Jelikož zadaný crontab "Pravidelna kontrola systemu" funguje v dlouhých intervalech, můžeme si zadat testovací crontab, který se bude lišit pouze v časových intervalech. Například tento "Crontab test": První řádek se zaktivuje každou minutu, druhý řádek se zaktivuje každých 10 minut. Stačí tedy třeba po 5 minutách zkontrolovat DIR "/monitoring", jestli se v něm vytváří files s příponou ".log" a po 10 minutách by se měla DIR "/monitoring" vyprázdnit a veškeré ".log" files by se měly přesunout do file "test.zip" v "/home/automata", který po otevření "vi test.zip" bude obsahovat přesunuté fily ".log")
+	
+	Pokud se tak stane, můžeme v "crontab -e" smazat nebo zakomentovat pomocí "#" náš testovací crontab "Crontab test", abychom jej vypnuli. Po uložení "wq!" máme jistotu, že náš crontab "Pravidelna kontrola systemu" opravdu funguje. Případné časové zadání crontabu můžeme ještě zkontrolovat na webové stránce "crontab.guru".
